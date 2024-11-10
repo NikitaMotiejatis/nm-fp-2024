@@ -1,0 +1,19 @@
+exit
+rent
+check user user1
+rent user1 bike1
+rent bike1 user1
+register bike bike1
+check user user1
+register user user1
+exit
+check user user1
+return bike1 user1
+check user user1
+rent user1 bike1
+rent uesr1 bike1
+register bike bike1
+register user user1
+register uesr user1
+register uesr user1
+exit
