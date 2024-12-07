@@ -1,4 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 module Lib3
   ( stateTransition,
     storageOpLoop,

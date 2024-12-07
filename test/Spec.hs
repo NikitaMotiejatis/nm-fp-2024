@@ -1,15 +1,10 @@
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 import Test.Tasty ( TestTree, defaultMain, testGroup )
 import Test.Tasty.HUnit ( testCase, (@?=), assertFailure )
 import Test.Tasty.QuickCheck as QC
-import Test.QuickCheck (Arbitrary(..), Positive(..))
-
-import Data.List
-import Data.Maybe (isJust)
 import Data.Char (isSpace)
-import Control.Concurrent.STM (newTVarIO)
-import Control.Concurrent (newChan)
-import Control.Monad (void)
 
 import qualified Lib2
 import qualified Lib3
