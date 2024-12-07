@@ -5,6 +5,10 @@ import Test.Tasty ( TestTree, defaultMain, testGroup )
 import Test.Tasty.HUnit ( testCase, (@?=), assertFailure )
 import Test.Tasty.QuickCheck as QC
 import Data.Char (isSpace)
+import Test.Tasty.QuickCheck as QC
+
+import Data.List
+import Data.Ord
 
 import qualified Lib2
 import qualified Lib3
