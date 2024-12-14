@@ -19,7 +19,6 @@ import Control.Concurrent (Chan, newChan, readChan, writeChan)
 import Control.Concurrent.STM (STM, TVar, atomically, readTVar, readTVarIO, writeTVar)
 import Control.Monad (forever)
 import Data.List (intercalate)
-import Data.Maybe (fromJust, isNothing)
 import System.Directory (doesFileExist)
 import qualified Lib2
 import qualified Parsers
@@ -53,12 +52,16 @@ data Command
   = StatementCommand Statements
   | LoadCommand
   | SaveCommand
+  | ViewCommand 
   deriving (Show, Eq)
 
 -- Parsing Functions
 
 parseCommand :: String -> Either String (Command, String)
-parseCommand = Parsers.runParser (parseLoad <|> parseSave <|> (StatementCommand <$> parseStatements))
+parseCommand = Parsers.runParser (parseLoad <|> parseSave <|> parseView <|> (StatementCommand <$> parseStatements))
+
+parseView :: Parsers.Parser Command
+parseView = ViewCommand <$ Parsers.parseLiteral "view"
 
 parseLoad :: Parsers.Parser Command
 parseLoad = LoadCommand <$ (Parsers.skipSpaces *> Parsers.parseLiteral "load")
@@ -104,23 +107,28 @@ renderStatements (Batch qs) = "BEGIN\n" ++ concatMap (\q -> renderQuery q ++ ";\
 
 -- | Updates a state according to a command.
 stateTransition :: TVar Lib2.State -> Command -> Chan StorageOp -> IO (Either String (Maybe String))
-stateTransition s SaveCommand ioChan = do
-  s' <- readTVarIO s
-  let content = renderStatements $ marshallState s'
+stateTransition state SaveCommand ioChan = do
+  s <- readTVarIO state
+  let content = renderStatements $ marshallState s
   chan <- newChan
   writeChan ioChan (Save content chan)
   readChan chan
   return $ Right $ Just "State saved successfully."
-stateTransition s LoadCommand ioChan = do
+stateTransition state LoadCommand ioChan = do
   chan <- newChan
   writeChan ioChan (Load chan)
   qs <- readChan chan
-  if isNothing qs
-    then return (Left "No state file found.")
-    else case Parsers.runParser parseStatements (fromJust qs) of
-      Left e -> return $ Left $ "Failed to load state from file:\n" ++ e
-      Right (stmts, _) -> atomically $ atomicStatements s stmts
-stateTransition s (StatementCommand stmts) _ = atomically $ atomicStatements s stmts
+  case qs of
+    Nothing -> return $ Left "No state file found."
+    Just savedContent ->
+      case Parsers.runParser parseStatements savedContent of
+        Left err -> return $ Left $ "Failed to parse saved state: " ++ err
+        Right (stmts, _) -> atomically $ atomicStatements state stmts
+stateTransition state (StatementCommand stmts) _ =
+  atomically $ atomicStatements state stmts
+stateTransition state ViewCommand _ = do
+  s <- readTVarIO state
+  return $ Right $ Just $ Lib2.renderState s  -- Use renderState here
 
 atomicStatements :: TVar Lib2.State -> Statements -> STM (Either String (Maybe String))
 atomicStatements s (Batch qs) = do

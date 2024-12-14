@@ -11,10 +11,10 @@ module Lib2
       emptyState,
       stateTransition,
       showUserID,
-      showBikeID
+      showBikeID,
+      renderState
     ) where
 
-import Data.Char (toLower)
 import Debug.Trace (trace)  -- Import trace for debugging
 
 data Query
@@ -25,6 +25,7 @@ data Query
   | RegisterBikeStmt BikeID
   | RegisterUserStmt UserID
   | ExitStmt
+  | ViewStmt
   | Sequence [Query]
   deriving (Eq, Show)
 
@@ -49,6 +50,21 @@ showUserID (UserID n) = "user" ++ show n
 showBikeID :: BikeID -> String
 showBikeID (BikeID n) = "bike" ++ show n
 
+-- Render the current state into a readable format
+renderState :: State -> String
+renderState state =
+  let userList = if null (users state)
+                   then "No users registered."
+                   else unlines $ map showUserID (users state)
+      bikeList = if null (bikes state)
+                   then "No bikes registered."
+                   else unlines $ map showBikeID (bikes state)
+      rentedList = if null (rentedBikes state)
+                     then "No bikes are currently rented."
+                     else unlines $ map (\(bike, user) -> showBikeID bike ++ " -> " ++ showUserID user) (rentedBikes state)
+  in "Users:\n" ++ userList ++ "\nBikes:\n" ++ bikeList ++ "\nRented Bikes:\n" ++ rentedList
+
+
 -- Debug version of stateTransition with trace
 stateTransition :: State -> Query -> Either String (Maybe String, State)
 stateTransition state q =
@@ -68,6 +84,7 @@ stateTransition state q =
                               handleRegisterBike state bid
       RegisterUserStmt uid -> trace ("Handling RegisterUserStmt for user=" ++ show uid) $
                               handleRegisterUser state uid
+      ViewStmt -> Right (Just (renderState state), state)
   where
     processQueries :: State -> [Query] -> Either String (Maybe String, State)
     processQueries st [] = Right (Nothing, st)

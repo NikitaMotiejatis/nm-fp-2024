@@ -20,7 +20,6 @@ module Parsers
 import Debug.Trace (trace)
 import Control.Applicative (Alternative(..))
 import Control.Monad.Except
-import Control.Monad.Except (throwError, catchError)
 import Control.Applicative (Alternative(..), optional)
 import Control.Monad.State
 import Data.Char (isDigit, isSpace, toLower)
@@ -130,6 +129,11 @@ parseRegisterStmt = do
         trace ("Parsed register bike statement: " ++ show bid) $ return ()
         return (RegisterBikeStmt bid)
 
+parseViewStmt :: Parser Query
+parseViewStmt = do
+    _ <- parseLiteral "view"
+    return ViewStmt
+
 
 parseExitStmt :: Parser Query
 parseExitStmt = do
@@ -142,7 +146,7 @@ parseStatement =
     <|> parseReturnStmt
     <|> parseCheckStmt
     <|> parseRegisterStmt
- 
+    <|> parseViewStmt
     <|> parseExitStmt
 
 sepBy :: Parser a -> Parser sep -> Parser [a]
