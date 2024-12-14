@@ -12,18 +12,26 @@ import System.Environment (getArgs)
 
 -- Command Data Type
 data Command next
-  = RegisterUser String next -- User ID
-  | RegisterBike String next -- Bike ID
-  | RentBike String String next -- User ID, Bike ID
-  | ReturnBike String String next -- Bike ID, User ID
+  = RegisterUser String next     -- User ID
+  | RegisterBike String next     -- Bike ID
+  | RentBike String String next  -- User ID, Bike ID
+  | ReturnBike String String next-- Bike ID, User ID
   | CheckBike String (String -> next) -- Bike ID
   | CheckUser String (String -> next) -- User ID
-  | View (String -> next) -- View the current state
+  | View (String -> next)       -- View the current state
+  | Save next                   -- Save the state
+  | Load (String -> next)       -- Load the state
   deriving (Functor)
 
 type BikeDSL = Free Command
 
 -- Smart Constructors
+save :: BikeDSL ()
+save = liftF $ Save ()
+
+load :: BikeDSL String
+load = liftF $ Load id
+
 registerUser :: String -> BikeDSL ()
 registerUser userId = liftF $ RegisterUser userId ()
 
@@ -45,39 +53,56 @@ checkUser userId = liftF $ CheckUser userId id
 view :: BikeDSL String
 view = liftF $ View id
 
--- HTTP Request per Command
+-- HTTP Request per Command (Single)
 runHttpSingle :: BikeDSL a -> IO a
 runHttpSingle (Pure a) = return a
 runHttpSingle (Free (RegisterUser userId next)) = do
   putStrLn $ "Sending request: register user(" ++ userId ++ ")"
   _ <- post "http://localhost:3000" (cs $ "register user " ++ userId :: ByteString)
   runHttpSingle next
+
 runHttpSingle (Free (RegisterBike bikeId next)) = do
   putStrLn $ "Sending request: register bike(" ++ bikeId ++ ")"
   _ <- post "http://localhost:3000" (cs $ "register bike " ++ bikeId :: ByteString)
   runHttpSingle next
+
 runHttpSingle (Free (RentBike userId bikeId next)) = do
   putStrLn $ "Sending request: rent(" ++ userId ++ ", " ++ bikeId ++ ")"
   _ <- post "http://localhost:3000" (cs $ "rent " ++ userId ++ " " ++ bikeId :: ByteString)
   runHttpSingle next
+
 runHttpSingle (Free (ReturnBike bikeId userId next)) = do
   putStrLn $ "Sending request: return(" ++ bikeId ++ ", " ++ userId ++ ")"
   _ <- post "http://localhost:3000" (cs $ "return " ++ bikeId ++ " " ++ userId :: ByteString)
   runHttpSingle next
+
 runHttpSingle (Free (CheckBike bikeId next)) = do
   putStrLn $ "Sending request: check bike(" ++ bikeId ++ ")"
   resp <- post "http://localhost:3000" (cs $ "check bike " ++ bikeId :: ByteString)
   runHttpSingle (next $ cs $ resp ^. responseBody)
+
 runHttpSingle (Free (CheckUser userId next)) = do
   putStrLn $ "Sending request: check user(" ++ userId ++ ")"
   resp <- post "http://localhost:3000" (cs $ "check user " ++ userId :: ByteString)
   runHttpSingle (next $ cs $ resp ^. responseBody)
+
 runHttpSingle (Free (View next)) = do
-  putStrLn "Sending request: view()"
+  putStrLn "Sending request: view"
   resp <- post "http://localhost:3000" (cs "view" :: ByteString)
+  putStrLn $ "Received response: " ++ cs (resp ^. responseBody)
   runHttpSingle (next $ cs $ resp ^. responseBody)
 
--- Smart HTTP Batcher
+runHttpSingle (Free (Save next)) = do
+  putStrLn "Sending request: save"
+  _ <- post "http://localhost:3000" (cs "save" :: ByteString)
+  runHttpSingle next
+
+runHttpSingle (Free (Load next)) = do
+  putStrLn "Sending request: load"
+  resp <- post "http://localhost:3000" (cs "load" :: ByteString)
+  runHttpSingle (next $ cs $ resp ^. responseBody)
+
+-- HTTP Request per Command (Batch)
 runHttpBatch :: BikeDSL a -> IO a
 runHttpBatch = runHttpBatch' []
 
@@ -88,14 +113,19 @@ runHttpBatch' acc (Pure a) = do
     _ <- post "http://localhost:3000" (cs $ unlines acc :: ByteString)
     return ()
   return a
+
 runHttpBatch' acc (Free (RegisterUser userId next)) =
   runHttpBatch' (acc ++ ["register user " ++ userId]) next
+
 runHttpBatch' acc (Free (RegisterBike bikeId next)) =
   runHttpBatch' (acc ++ ["register bike " ++ bikeId]) next
+
 runHttpBatch' acc (Free (RentBike userId bikeId next)) =
   runHttpBatch' (acc ++ ["rent " ++ userId ++ " " ++ bikeId]) next
+
 runHttpBatch' acc (Free (ReturnBike bikeId userId next)) =
   runHttpBatch' (acc ++ ["return " ++ bikeId ++ " " ++ userId]) next
+
 runHttpBatch' acc (Free (CheckBike bikeId next)) = do
   unless (null acc) $ do
     putStrLn $ "Sending batch request: " ++ unlines acc
@@ -103,6 +133,7 @@ runHttpBatch' acc (Free (CheckBike bikeId next)) = do
     return ()
   resp <- post "http://localhost:3000" (cs $ "check bike " ++ bikeId :: ByteString)
   runHttpBatch' [] (next $ cs $ resp ^. responseBody)
+
 runHttpBatch' acc (Free (CheckUser userId next)) = do
   unless (null acc) $ do
     putStrLn $ "Sending batch request: " ++ unlines acc
@@ -110,12 +141,31 @@ runHttpBatch' acc (Free (CheckUser userId next)) = do
     return ()
   resp <- post "http://localhost:3000" (cs $ "check user " ++ userId :: ByteString)
   runHttpBatch' [] (next $ cs $ resp ^. responseBody)
+
 runHttpBatch' acc (Free (View next)) = do
   unless (null acc) $ do
     putStrLn $ "Sending batch request: " ++ unlines acc
     _ <- post "http://localhost:3000" (cs $ unlines acc :: ByteString)
     return ()
   resp <- post "http://localhost:3000" (cs "view" :: ByteString)
+  runHttpBatch' [] (next $ cs $ resp ^. responseBody)
+
+runHttpBatch' acc (Free (Save next)) = do
+  unless (null acc) $ do
+    putStrLn $ "Sending batch request: " ++ unlines acc
+    _ <- post "http://localhost:3000" (cs $ unlines acc :: ByteString)
+    return ()
+  putStrLn "Sending request: save"
+  _ <- post "http://localhost:3000" (cs "save" :: ByteString)
+  runHttpBatch' [] next
+
+runHttpBatch' acc (Free (Load next)) = do
+  unless (null acc) $ do
+    putStrLn $ "Sending batch request: " ++ unlines acc
+    _ <- post "http://localhost:3000" (cs $ unlines acc :: ByteString)
+    return ()
+  putStrLn "Sending request: load"
+  resp <- post "http://localhost:3000" (cs "load" :: ByteString)
   runHttpBatch' [] (next $ cs $ resp ^. responseBody)
 
 -- In-Memory Interpreter
@@ -136,14 +186,21 @@ runInMemory (Free (ReturnBike bikeId userId next)) = do
   modify (filter (\(entry, _) -> not (entry == userId ++ " rents " ++ bikeId)))
   runInMemory next
 runInMemory (Free (CheckBike bikeId next)) = do
-  currentState <- Control.Monad.State.get
+  currentState <- get
   runInMemory (next $ maybe "Available" id (lookup bikeId currentState))
 runInMemory (Free (CheckUser userId next)) = do
-  currentState <- Control.Monad.State.get
+  currentState <- get
   let rentedBikes = [bike | (user, bike) <- currentState, user == userId]
   runInMemory (next $ unwords rentedBikes)
 runInMemory (Free (View next)) = do
-  currentState <- Control.Monad.State.get
+  currentState <- get
+  runInMemory (next $ show currentState)
+runInMemory (Free (Save next)) = do
+  -- Saving is a no-op in memory (just keep the current state)
+  runInMemory next
+runInMemory (Free (Load next)) = do
+  -- Loading returns the current state as a string
+  currentState <- get
   runInMemory (next $ show currentState)
 
 -- Main Program
@@ -151,9 +208,10 @@ main :: IO ()
 main = do
   args <- getArgs
   let program = do
-        registerUser "user1"
-        registerBike "bike1"
-        rentBike "user1" "bike1"
+        load
+        registerUser "user3"
+        registerBike "bike3"
+        rentBike "user3" "bike3"
         view
 
   case args of
