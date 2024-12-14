@@ -6,6 +6,7 @@ import Control.Monad.State.Strict
 import Data.List qualified as L
 import Lib1 qualified
 import Lib2 qualified
+import Parsers qualified
 import System.Console.Repline
   ( CompleterStyle (Word),
     ExitDecision (Exit),
@@ -30,7 +31,7 @@ completer n =
 
 cmd :: String -> Repl ()
 cmd str = do
-  case Lib2.parseQuery str of
+  case Parsers.parseQuery str of
     Left e -> liftIO $ putStrLn $ "PARSE ERROR:" ++ e
     Right e -> do
       st <- lift get

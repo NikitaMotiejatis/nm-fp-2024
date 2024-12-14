@@ -60,27 +60,31 @@ lib2PropertyTests = testGroup "Lib2 Property Tests"
                             _ -> False
   ]
 
--- Tests for Lib3
+-- | Tests for Lib3
 lib3Tests :: TestTree
 lib3Tests = testGroup "Lib3 Tests" [lib3UnitTests, lib3PropertyTests]
 
 lib3UnitTests :: TestTree
 lib3UnitTests = testGroup "Lib3 Unit Tests"
   [ testCase "Parsing valid Command: save" $
-      Lib3.parseCommand "save" @?= Right (Lib3.SaveCommand, ""),
+      Parsers.parse Lib3.parseCommand "save" @?= Right (Lib3.SaveCommand, ""),
     testCase "Parsing valid Command: load" $
-      Lib3.parseCommand "load" @?= Right (Lib3.LoadCommand, ""),
+      Parsers.parse Lib3.parseCommand "load" @?= Right (Lib3.LoadCommand, ""),
     testCase "Parsing valid Command: BEGIN ... END" $ do
       let input = "BEGIN\nregister user user1;\nregister bike bike1;\nEND\n"
-      case Lib3.parseCommand input of
+      case Parsers.parse Lib3.parseCommand input of
         Right (Lib3.StatementCommand (Lib3.Batch qs), rest) | all isSpace rest -> length qs @?= 2
         Left err -> assertFailure $ "Failed to parse batch command: " ++ err
         Right (_, rest) -> assertFailure $ "Unexpected input after parsing: " ++ rest,
     testCase "State marshalling and unmarshalling" $ do
-      let state = Lib2.State { Lib2.users = [Lib2.UserID 1], Lib2.bikes = [Lib2.BikeID 1], Lib2.rentedBikes = [(Lib2.BikeID 1, Lib2.UserID 1)] }
+      let state = Lib2.State 
+            { Lib2.users = [Lib2.UserID 1], 
+              Lib2.bikes = [Lib2.BikeID 1], 
+              Lib2.rentedBikes = [(Lib2.BikeID 1, Lib2.UserID 1)] 
+            }
       let statements = Lib3.marshallState state
       let rendered = Lib3.renderStatements statements
-      case Lib2.parse Lib3.parseStatements rendered of
+      case Parsers.parse Lib3.parseStatements rendered of
         Right (stmts', rest) | all isSpace rest -> stmts' @?= statements
         Left err -> assertFailure err
         Right (_, rest) -> assertFailure $ "Unexpected input after parsing: " ++ rest
@@ -88,11 +92,10 @@ lib3UnitTests = testGroup "Lib3 Unit Tests"
 
 lib3PropertyTests :: TestTree
 lib3PropertyTests = testGroup "Lib3 Property Tests"
-  [
-    QC.testProperty "parseStatements . renderStatements == Right (s, \"\")" $
+  [ QC.testProperty "parseStatements . renderStatements == Right (s, \"\")" $
       \state -> let statements = Lib3.marshallState (state :: Lib2.State)
                     rendered = Lib3.renderStatements statements
-                    parseResult = Lib2.parse Lib3.parseStatements rendered
+                    parseResult = Parsers.parse Lib3.parseStatements rendered
                 in case parseResult of
                      Right (stmts', rest) -> all isSpace rest && stmts' == statements
                      _ -> False

@@ -1,7 +1,7 @@
 BEGIN
-register user user2;
 register user user1;
-register bike bike2;
 register bike bike1;
+register bike bike2;
+rent user1 bike2;
 rent user1 bike1;
 END

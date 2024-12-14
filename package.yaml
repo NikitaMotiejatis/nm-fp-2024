@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - directory
+- mtl
 
 ghc-options:
 - -Wall
@@ -44,6 +45,7 @@ library:
   - QuickCheck
   - transformers
   - strict
+  - mtl
 
 executables:
   fp2024-one:
@@ -67,6 +69,7 @@ executables:
     - fp2024
     - repline
     - mtl
+    - stm
   fp2024-three:
     main:                Main.hs
     source-dirs:         app3
@@ -93,6 +96,9 @@ executables:
     - wreq
     - bytestring
     - string-conversions
+    - mtl
+    - stm
+    - free
   fp2024-four-server:
     main:                Main.hs
     source-dirs:         app4-server
@@ -105,6 +111,8 @@ executables:
     - repline
     - scotty
     - string-conversions
+    - mtl
+    - stm
 
 tests:
   fp2024-test:

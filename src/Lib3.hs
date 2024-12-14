@@ -14,7 +14,7 @@ module Lib3
   )
 where
 
-import Control.Applicative (Alternative (many), (<|>))
+import Control.Applicative (Alternative(many), (<|>))
 import Control.Concurrent (Chan, newChan, readChan, writeChan)
 import Control.Concurrent.STM (STM, TVar, atomically, readTVar, readTVarIO, writeTVar)
 import Control.Monad (forever)
@@ -22,7 +22,7 @@ import Data.List (intercalate)
 import Data.Maybe (fromJust, isNothing)
 import System.Directory (doesFileExist)
 import qualified Lib2
-import Lib2 (Parser(..), parseLiteral, skipSpaces)
+import qualified Parsers
 
 -- | Storage Operation data type to represent Save and Load operations
 data StorageOp = Save String (Chan ()) | Load (Chan (Maybe String))
@@ -58,24 +58,24 @@ data Command
 -- Parsing Functions
 
 parseCommand :: String -> Either String (Command, String)
-parseCommand = Lib2.parse (parseLoad <|> parseSave <|> (StatementCommand <$> parseStatements))
+parseCommand = Parsers.runParser (parseLoad <|> parseSave <|> (StatementCommand <$> parseStatements))
 
-parseLoad :: Parser Command
-parseLoad = LoadCommand <$ (skipSpaces *> parseLiteral "load")
+parseLoad :: Parsers.Parser Command
+parseLoad = LoadCommand <$ (Parsers.skipSpaces *> Parsers.parseLiteral "load")
 
-parseSave :: Parser Command
-parseSave = SaveCommand <$ (skipSpaces *> parseLiteral "save")
+parseSave :: Parsers.Parser Command
+parseSave = SaveCommand <$ (Parsers.skipSpaces *> Parsers.parseLiteral "save")
 
-parseStatements :: Parser Statements
-parseStatements = parseBatch <|> (Single <$> Lib2.parseStatement)
+parseStatements :: Parsers.Parser Statements
+parseStatements = parseBatch <|> (Single <$> Parsers.parseStatement)
 
-parseBatch :: Parser Statements
+parseBatch :: Parsers.Parser Statements
 parseBatch = do
-  skipSpaces
-  parseLiteral "BEGIN"
-  skipSpaces
-  qs <- many (Lib2.parseStatement <* parseLiteral ";" <* skipSpaces)
-  parseLiteral "END"
+  Parsers.skipSpaces
+  Parsers.parseLiteral "BEGIN"
+  Parsers.skipSpaces
+  qs <- many (Parsers.parseStatement <* Parsers.parseLiteral ";" <* Parsers.skipSpaces)
+  Parsers.parseLiteral "END"
   return $ Batch qs
 
 -- | Converts program's state into Statements
@@ -117,7 +117,7 @@ stateTransition s LoadCommand ioChan = do
   qs <- readChan chan
   if isNothing qs
     then return (Left "No state file found.")
-    else case Lib2.parse parseStatements (fromJust qs) of
+    else case Parsers.runParser parseStatements (fromJust qs) of
       Left e -> return $ Left $ "Failed to load state from file:\n" ++ e
       Right (stmts, _) -> atomically $ atomicStatements s stmts
 stateTransition s (StatementCommand stmts) _ = atomically $ atomicStatements s stmts
