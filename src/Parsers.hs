@@ -25,7 +25,7 @@ import Control.Monad.State
 import Data.Char (isDigit, isSpace, toLower)
 import Lib2 (Query(..), UserID(..), BikeID(..))
 
--- | Parser type definition using ExceptT and State
+-- | Parser type definition
 type Parser a = ExceptT String (State String) a
 
 -- runParser: a helper to run our Parser on an input string

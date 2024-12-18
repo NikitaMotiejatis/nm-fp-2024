@@ -105,7 +105,6 @@ renderStatements :: Statements -> String
 renderStatements (Single q) = renderQuery q
 renderStatements (Batch qs) = "BEGIN\n" ++ concatMap (\q -> renderQuery q ++ ";\n") qs ++ "END\n"
 
--- | Updates a state according to a command.
 stateTransition :: TVar Lib2.State -> Command -> Chan StorageOp -> IO (Either String (Maybe String))
 stateTransition state SaveCommand ioChan = do
   s <- readTVarIO state

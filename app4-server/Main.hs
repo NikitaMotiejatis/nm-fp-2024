@@ -12,7 +12,7 @@ import qualified Lib2
 import qualified Lib3
 import Web.Scotty
 
--- Main entry point for the server
+
 main :: IO ()
 main = do
   -- Create a shared channel for storage operations
@@ -51,4 +51,4 @@ handleRequest state storageChan input =
           return $ fromMaybe "Success" output
     Right (_, remaining) -> return $ "PARSE ERROR: Unexpected input: " ++ remaining
 
--- Example: parseCommand and stateTransition functions should be implemented in `Lib3` based on your current state.
+

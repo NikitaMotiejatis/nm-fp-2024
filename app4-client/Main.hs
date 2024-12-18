@@ -203,7 +203,7 @@ runInMemory (Free (Load next)) = do
   currentState <- get
   runInMemory (next $ show currentState)
 
--- Main Program
+
 main :: IO ()
 main = do
   args <- getArgs
